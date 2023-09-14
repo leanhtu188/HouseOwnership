@@ -1,0 +1,2 @@
+﻿enum Gender { Male, Female }
+
