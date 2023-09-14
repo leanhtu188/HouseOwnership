@@ -4,124 +4,236 @@ using System.Text;
 Console.InputEncoding = Encoding.UTF8;
 Console.OutputEncoding = Encoding.UTF8;
 
-var app = new App();    
+var graph = Import();
+var app = new App(graph);
 app.Run();
 
+List<Person> Import()
+{
+    List<Person> graph = new();
+    string path;
+    do
+    {
+        path = AnsiConsole.Ask<string>("Enter file path: ");
+        if (!File.Exists(path))
+        {
+            Console.WriteLine("File not found.");
+            path = string.Empty;
+        }
+        if(!path.EndsWith(".csv") && !path.EndsWith(".txt"))
+        {
+            Console.WriteLine("File must be of type CSV or TXT.");
+        }
+    } while (string.IsNullOrEmpty(path));
+
+    using var reader = new StreamReader(File.OpenRead(path));
+    string? line = string.Empty;
+    AnsiConsole.Status()
+        .Start("Importing", ctx =>
+        {
+            while (!reader.EndOfStream)
+            {
+                try
+                {
+                    line = reader.ReadLine();
+                    if (string.IsNullOrEmpty(line)) continue;
+                    var fields = line.Split("\t");
+                    if (string.IsNullOrEmpty(fields[Fields.ID])) continue;
+
+                    var person = new Person()
+                    {
+                        Id = fields[Fields.ID],
+                        Gender = fields[Fields.GENDER] == "0" ? Gender.Male : Gender.Female,
+                        Name = fields[Fields.FULL_NAME],
+                        FatherName = fields[Fields.FATHER_NAME],
+                        MotherName = fields[Fields.MOTHER_NAME],
+                        HouseOwnerName = fields[Fields.NAME_OF_OWNER],
+                        Town = fields[Fields.TOWN],
+                        CardNumber = fields[Fields.CARD_NUMBER],
+                        RelationshipWithHouseOwner = fields[Fields.RELATIONSHIP_WITH_HOUSE_OWNER]
+                    };
+                    if (!graph.Any(x => x.Id == person.Id)) graph.Add(person);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"ERROR: {ex.Message}");
+                    Console.WriteLine($"Entry: {line}");
+                }
+            }
+
+            ctx.Status("Building relationship graph");
+            ctx.Refresh();
+
+            foreach (var person in graph)
+            {
+                if (person.FatherName != null)
+                {
+                    var father = graph.FirstOrDefault(x => x.Name == person.FatherName);
+                    person.Father = father;
+                }
+                if (person.MotherName != null)
+                {
+                    var mother = graph.FirstOrDefault(x => x.Name == person.MotherName);
+                    person.Mother = mother;
+                }
+                if(person.Father != null && person.Mother!= null) 
+                {
+                    person.Father.Spouse = person.Mother;
+                    person.Mother.Spouse = person.Father;
+                }
+
+                if (!string.IsNullOrEmpty(person.HouseOwnerName) &&
+                    (person.RelationshipWithHouseOwner?.ToLower() == "vợ"
+                    || person.RelationshipWithHouseOwner?.ToLower() == "chồng"))
+                {
+                    var spouse = graph.FirstOrDefault(x => x.Name == person.HouseOwnerName);
+                    if (spouse == null) continue;
+                    person.Spouse = spouse;
+                    spouse.Spouse = person;
+                }
+            }
+        });
+    Console.Clear();
+    return graph;
+}
 class App
 {
-    private readonly List<Person> _people = new();
-    private const string DELIMITER = "\t";
-    private class Fields
+    public App(IEnumerable<Person> persons)
     {
-        public const int TOWN = 1;
-        public const int HSHK = 2;
-        public const int ID = 3;
-        public const int FULL_NAME = 4;
-        public const int FAMILY_NAME = 5;
-        public const int GIVEN_NAME = 6;
-        public const int DATE_OF_BIRTH = 7;
-        public const int RELATIONSHIP_WITH_HOUSE_OWNER = 8;
-        public const int GENDER = 9;
-        public const int MOVEMENT = 10;
-        public const int TIME = 11;
-        public const int NEW_ADDRESS = 12;
-        public const int RACE = 13;
-        public const int RELIGION = 14;
-        public const int CARD_NUMBER = 15;
-        public const int UNKNOWN_1 = 16;
-        public const int UNKNOWN_2 = 17;
-        public const int RESIDENCE = 18;
-        public const int PLACE_OF_BIRTH = 19;
-        public const int FATHER_NAME = 20;
-        public const int MOTHER_NAME = 21;
-        public const int NAME_OF_OWNER = 22;
-    }
+        _people = persons.ToList();
+    } 
+
+    private readonly List<Person> _people;
 
     private bool _ended = false;
 
     public void Run()
     {
-        Import();
-        while(!_ended)
+        while (!_ended)
         {
             var selection = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                 .AddChoices(new[] {
                     "Lookup Relationships",
+                    "Draw Family Tree",
                     "Quit"
                 }));
 
             if (selection == "Quit") _ended = true;
-            else if(selection == "Lookup Relationships")
+            else if (selection == "Lookup Relationships")
             {
-                LookupRelationship();
-            } else if(selection == "Draw Family Tree")
-            {
-                DrawFamilyTree();
-            }
-        }
-    }
-
-    private void DrawFamilyTree()
-    {
-        string id = AnsiConsole.Prompt(
+                string id1 = AnsiConsole.Prompt(
                 new TextPrompt<string>("Enter first person ID: ")
                 .PromptStyle("green")
-                .ValidationErrorMessage("[red]ID not found[/red]")
+                .ValidationErrorMessage("ID not found")
                 .Validate(id =>
                 {
                     return _people.Any(x => x.Id == id);
                 })
             );
 
-        var startNode = _people.First(x => x.Id == id);
-
-
-
+                string id2 = AnsiConsole.Prompt(
+                        new TextPrompt<string>("Enter second person ID: ")
+                        .PromptStyle("green")
+                        .ValidationErrorMessage("ID not found")
+                        .Validate(id =>
+                        {
+                            return _people.Any(x => x.Id == id) && id != id1;
+                        })
+                    );
+                LookupRelationship(id1, id2);
+            }
+            else if (selection == "Draw Family Tree")
+            {
+                string id = AnsiConsole.Prompt(
+                    new TextPrompt<string>("Enter first person ID: ")
+                    .PromptStyle("green")
+                    .ValidationErrorMessage("ID not found")
+                    .Validate(id =>
+                    {
+                        return _people.Any(x => x.Id == id);
+                    })
+                );
+                DrawFamilyTree(id);
+            }
+        }
     }
 
-    private void LookupRelationship()
+    public void DrawFamilyTree(string id)
     {
-        string id1 = AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter first person ID: ")
-                .PromptStyle("green")
-                .ValidationErrorMessage("[red]ID not found[/red]")
-                .Validate(id =>
-                {
-                    return _people.Any(x => x.Id  == id);
-                })
-            );
+        var startPerson = _people.First(x => x.Id == id);
 
-        string id2 = AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter second person ID: ")
-                .PromptStyle("green")
-                .ValidationErrorMessage("[red]ID not found[/red]")
-                .Validate(id =>
-                {
-                    return _people.Any(x => x.Id == id) && id != id1;
-                })
-            );
+        var root = new Tree($"Family tree of {startPerson.Name}");
+        Queue<Person> unvisitedPeople = new();
+        Dictionary<Person, Person?> rlts = new();
+        Dictionary<Person, TreeNode> nodes = new();
+        unvisitedPeople.Enqueue(startPerson);
+        while (unvisitedPeople.Any())
+        {
+            var visited = unvisitedPeople.Dequeue();
+            if (visited.Father != null && !rlts.ContainsKey(visited.Father))
+            {
+                rlts.Add(visited.Father, visited);
+                unvisitedPeople.Enqueue(visited.Father); 
+            }
 
+            if (visited.Mother != null && !rlts.ContainsKey(visited.Mother))
+            {
+                rlts.Add(visited.Mother, visited);
+                unvisitedPeople.Enqueue(visited.Mother);
+            }
+            if (visited.Spouse != null && !rlts.ContainsKey(visited.Spouse))
+            {
+                rlts.Add(visited.Spouse, visited);
+                unvisitedPeople.Enqueue(visited.Spouse);
+            }
+            if (rlts.ContainsKey(visited) && rlts[visited] != null)
+            {
+                nodes[visited] = nodes[rlts[visited]!].AddNode($"{visited?.Name}-{visited?.Id}" ?? string.Empty);
+            }
+            else
+            {
+                nodes[visited] = root.AddNode($"{visited?.Name}-{visited?.Id}" ?? string.Empty);
+            }
+        }
+
+        AnsiConsole.Write(root);
+    }
+    public List<Person> LookupRelationship(string id1, string id2)
+    {
         var startNode = _people.First(x => x.Id == id1);
         var endNode = _people.First(x => x.Id == id2);
 
         Queue<Person> unvisitedNodes = new();
-        Dictionary<Person,Person?> currentPath = new();
+        Dictionary<Person, Person?> currentPath = new()
+        {
+            { startNode, null }
+        };
         unvisitedNodes.Enqueue(startNode);
 
         Person? parentNode = null;
 
+        List<Person> mainPath = new();
         while (unvisitedNodes.Any())
         {
             var visited = unvisitedNodes.Dequeue();
 
-            currentPath[visited] = parentNode;
-
             if (visited == endNode) break;
-
-            if (visited.Father != null && !currentPath.ContainsKey(visited.Father)) unvisitedNodes.Enqueue(visited.Father);
-            if (visited.Mother != null && !currentPath.ContainsKey(visited.Mother)) unvisitedNodes.Enqueue(visited.Mother);
-            if (visited.Spouse != null && !currentPath.ContainsKey(visited.Spouse)) unvisitedNodes.Enqueue(visited.Spouse);
+            if (visited.Father != null && !currentPath.ContainsKey(visited.Father))
+            {
+                currentPath[visited.Father] = visited;
+                unvisitedNodes.Enqueue(visited.Father);
+            }
+            if (visited.Mother != null && !currentPath.ContainsKey(visited.Mother))
+            {
+                currentPath[visited.Mother] = visited;
+                unvisitedNodes.Enqueue(visited.Mother);
+            }
+            if (visited.Spouse != null && !currentPath.ContainsKey(visited.Spouse))
+            {
+                currentPath[visited.Spouse] = visited;
+                unvisitedNodes.Enqueue(visited.Spouse);
+            }
 
             parentNode = visited;
         }
@@ -129,111 +241,45 @@ class App
         if (!currentPath.ContainsKey(endNode))
         {
             Console.WriteLine($"{startNode.Name} and {endNode.Name} are not related.");
-        } else
+        }
+        else
         {
-            List<Person> mainPath = new();
             Person index = endNode;
-            while(currentPath.ContainsKey(index!) && currentPath[index!] != null)
+            while (index is not null && currentPath.ContainsKey(index))
             {
-                mainPath.Add(currentPath[index]!);
+                mainPath.Add(index);
                 index = currentPath[index]!;
             }
 
             mainPath.Reverse();
-            Console.WriteLine(string.Join(" - ", mainPath.Select(x => x.Name)));
-        }
-    }
-
-    private void Import()
-    {
-        string path;
-        do
-        {
-            path = AnsiConsole.Ask<string>("Enter file path: ");
-            if (!File.Exists(path))
+            foreach (var i in Enumerable.Range(0, mainPath.Count - 1))
             {
-                Console.WriteLine("File not found.");
-                path = string.Empty;
+                PrintRelationship(mainPath[i], mainPath[i + 1]);
             }
-        } while(string.IsNullOrEmpty(path));
-
-        using var reader = new StreamReader(File.OpenRead(path));
-
-        string? line;
-        do
-        {
-            line = reader.ReadLine();
-        } while (line?.StartsWith("1") != true);
-
-        AnsiConsole.Status()
-            .Start("Importing", ctx => {
-                while (!reader.EndOfStream)
-                {
-                    try
-                    {
-                        line = reader.ReadLine();
-                        if (string.IsNullOrEmpty(line)) continue;
-                        var fields = line.Split(DELIMITER);
-                        if (string.IsNullOrEmpty(fields[Fields.ID])) continue;
-                    
-                        var person = new Person()
-                        {
-                            Id = fields[Fields.ID],
-                            Gender = fields[Fields.GENDER] == "0" ? Gender.Male : Gender.Female,
-                            Name = fields[Fields.FULL_NAME],
-                            FatherName = fields[Fields.FATHER_NAME],
-                            MotherName = fields[Fields.MOTHER_NAME],
-                            HouseOwnerName = fields[Fields.NAME_OF_OWNER],
-                            Town = fields[Fields.TOWN],
-                            CardNumber = fields[Fields.CARD_NUMBER],
-                            RelationshipWithHouseOwner = fields[Fields.RELATIONSHIP_WITH_HOUSE_OWNER]
-                        };
-                        if (!_people.Any(x => x.Id == person.Id)) _people.Add(person);
-                    }catch(Exception ex) 
-                    { 
-                        Console.WriteLine($"ERROR: {ex.Message}");
-                        Console.WriteLine($"Entry: {line}");
-                    }
-                }
-
-                ctx.Status("Building relationship graph");
-                ctx.Refresh();
-
-                foreach (var person in _people)
-                {
-                    if (person.FatherName != null)
-                    {
-                        var father = _people.FirstOrDefault(x => x.Name == person.FatherName);
-                        person.Father = father;
-                    }
-                    if (person.MotherName != null)
-                    {
-                        var mother = _people.FirstOrDefault(x => x.Name == person.MotherName);
-                        person.Mother = mother;
-                    }
-
-                    if (!string.IsNullOrEmpty(person.HouseOwnerName) &&
-                        (person.RelationshipWithHouseOwner?.ToLower() == "vợ"
-                        || person.RelationshipWithHouseOwner?.ToLower() == "chồng"))
-                    {
-                        var spouse = _people.FirstOrDefault(x => x.Name == person.HouseOwnerName);
-                        if (spouse == null) continue;
-                        person.Spouse = spouse;
-                        spouse.Spouse = person;
-                    }
-                }
-            });
-
-        
+        }
+        return mainPath;
+    }
+    private static void PrintRelationship(Person person1, Person person2)
+    {
+        if (person2 == person1.Father || person2 == person1.Mother)
+            Console.WriteLine($"{person1.Name}-{person1.Id} is the {(person1.Gender == Gender.Male ? "Son" : "Daughter")} of {person2.Name}-{person2.Id}");
+        else if (person2 == person1.Spouse)
+            Console.WriteLine($"{person1.Name}-{person1.Id} is the {(person1.Gender == Gender.Male ? "Husband" : "Wife")} of {person2.Name}-{person2.Id}");
+        else if (person1 == person2.Father)
+            Console.WriteLine($"{person1.Name}-{person1.Id} is the Father of {person2.Name}-{person2.Id}");
+        else if (person1 == person2.Mother)
+            Console.WriteLine($"{person1.Name}-{person1.Id} is the Mother of {person2.Name}-{person2.Id}");
+        else
+            Console.WriteLine($"{person1.Name}-{person1.Id} and {person2.Name}-{person2.Id} are not related");
     }
 }
 
 
 class Person
 {
-    public string Town { get; set; }
-    public string Name { get; set; }
-    public string Id { get; set; }
+    public string? Town { get; set; }
+    public string? Name { get; set; }
+    public required string Id { get; set; }
     public bool IsHouseOwner { get; set; }
     public Person? Father { get; set; }
     public string? FatherName { get; set; }
@@ -247,3 +293,4 @@ class Person
 
 }
 enum Gender { Male, Female }
+
