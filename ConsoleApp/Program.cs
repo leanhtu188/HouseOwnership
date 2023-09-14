@@ -69,12 +69,16 @@ List<Person> Import()
                 if (person.FatherName != null)
                 {
                     var father = graph.FirstOrDefault(x => x.Name == person.FatherName);
+                    if (father is null) continue;
                     person.Father = father;
+                    father.Children.Add(person);
                 }
                 if (person.MotherName != null)
                 {
                     var mother = graph.FirstOrDefault(x => x.Name == person.MotherName);
+                    if (mother is null) continue;
                     person.Mother = mother;
+                    mother.Children.Add(person);
                 }
                 if(person.Father != null && person.Mother!= null) 
                 {

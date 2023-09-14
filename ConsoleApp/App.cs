@@ -91,6 +91,19 @@ class App
                 rlts.Add(visited.Spouse, visited);
                 unvisitedPeople.Enqueue(visited.Spouse);
             }
+            if (visited.Children.Any())
+            {
+                foreach (var child in visited.Children)
+                {
+                    if (!rlts.ContainsKey(child))
+                    {
+                        rlts.Add(child, visited);
+                        unvisitedPeople.Enqueue(child);
+                    }
+                }
+            }
+
+
             if (rlts.ContainsKey(visited) && rlts[visited] != null)
             {
                 nodes[visited] = nodes[rlts[visited]!].AddNode($"{visited?.Name}-{visited?.Id}" ?? string.Empty);
@@ -137,6 +150,18 @@ class App
             {
                 currentPath[visited.Spouse] = visited;
                 unvisitedNodes.Enqueue(visited.Spouse);
+            }
+
+            if (visited.Children.Any())
+            {
+                foreach(var child in visited.Children)
+                {
+                    if (!currentPath.ContainsKey(child))
+                    {
+                        currentPath[child] = visited;
+                        unvisitedNodes.Enqueue(child);
+                    }
+                }
             }
 
             parentNode = visited;

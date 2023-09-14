@@ -13,6 +13,7 @@
     public string? HouseOwnerName { get; set; }
     public Gender Gender { get; set; }
     public string? CardNumber { get; set; }
+    public List<Person> Children { get; set; } = new();
 
 }
 
