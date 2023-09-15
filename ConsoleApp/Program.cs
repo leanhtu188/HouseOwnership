@@ -80,22 +80,127 @@ List<Person> Import()
                     person.Mother = mother;
                     mother.Children.Add(person);
                 }
-                if(person.Father != null && person.Mother!= null) 
+                if (person.Father != null && person.Mother != null)
                 {
                     person.Father.Spouse = person.Mother;
                     person.Mother.Spouse = person.Father;
                 }
 
                 if (!string.IsNullOrEmpty(person.HouseOwnerName) &&
-                    (person.RelationshipWithHouseOwner?.ToLower() == "vợ"
-                    || person.RelationshipWithHouseOwner?.ToLower() == "chồng"))
+                    !string.IsNullOrEmpty(person.RelationshipWithHouseOwner))
                 {
-                    var spouse = graph.FirstOrDefault(x => x.Name == person.HouseOwnerName);
-                    if (spouse == null) continue;
-                    person.Spouse = spouse;
-                    spouse.Spouse = person;
+                    var relationship = person.RelationshipWithHouseOwner?.ToLower().Trim();
+                    var other = graph.FirstOrDefault(x => x.Name == person.HouseOwnerName);
+                    if (other == null) continue;
+                    if (relationship == "vợ" || relationship == "chồng")
+                    {
+                        person.Spouse = other;
+                        other.Spouse = person;
+                    }
+                    else if (relationship == "anh ruột"
+                        || relationship == "em"
+                        || relationship == "em gái"
+                        || relationship == "em trai"
+                        || relationship == "chị")
+                    {
+                        if (person.Father != null) other.Father = person.Father;
+                        else if (other.Father != null) person.Father = other.Father;
+
+                        if (person.Mother != null) other.Mother = person.Mother;
+                        else if (other.Mother != null) person.Mother = other.Mother;
+                    }
+                    else if (relationship == "anh vợ")
+                    {
+
+                    }
+                    else if (relationship == "bà nội")
+                    {
+
+                    }
+                    else if (relationship == "bà ngoại")
+                    {
+
+                    }
+                    else if (relationship == "bác")
+                    {
+
+                    }
+                    else if (relationship == "bố")
+                    {
+
+                    }
+                    else if (relationship == "bố chồng")
+                    {
+
+                    }
+                    else if (relationship == "cháu")
+                    {
+
+                    }
+                    else if (relationship == "cháu họ")
+                    {
+
+                    }
+                    else if (relationship == "cháu ngoại")
+                    {
+
+                    }
+                    else if (relationship == "cháu nội")
+                    {
+
+                    }
+                    else if (relationship == "chị chồng")
+                    {
+
+                    }
+                    else if (relationship == "con")
+                    {
+                        if (other.Gender == Gender.Male) person.Father = other;
+                        else if (other.Gender == Gender.Female) person.Mother = other;
+                    }
+                    else if (relationship == "con dâu")
+                    {
+
+                    }
+                    else if (relationship == "con nuôi")
+                    {
+
+                    }
+                    else if (relationship == "con rể")
+                    {
+
+                    }
+                    else if (relationship == "con vợ")
+                    {
+
+                    }
+                    else if (relationship == "em dâu")
+                    {
+
+                    }
+                    else if (relationship == "em họ")
+                    {
+
+                    }
+                    else if (relationship == "mẹ chồng")
+                    {
+
+                    }
+                    else if (relationship == "người ở nhờ")
+                    {
+
+                    }
+                    else if (relationship == "ông ngoại")
+                    {
+
+                    }
+                    else if (relationship == "ông nội")
+                    {
+
+                    }
                 }
             }
+
         });
     Console.Clear();
     return graph;

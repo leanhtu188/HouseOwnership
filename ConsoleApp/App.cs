@@ -1,6 +1,6 @@
 ﻿using Spectre.Console;
 
-class App
+public class App
 {
     public App(IEnumerable<Person> persons)
     {

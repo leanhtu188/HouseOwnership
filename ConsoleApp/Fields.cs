@@ -1,4 +1,4 @@
-﻿class Fields
+﻿public class Fields
 {
     public const int TOWN = 1;
     public const int HSHK = 2;

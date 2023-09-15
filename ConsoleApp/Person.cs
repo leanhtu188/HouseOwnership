@@ -1,4 +1,4 @@
-﻿class Person
+﻿public class Person
 {
     public string? Town { get; set; }
     public string? Name { get; set; }
