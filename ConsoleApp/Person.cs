@@ -1,4 +1,6 @@
-﻿public class Person
+﻿using ConsoleApp;
+
+public class Person
 {
     public string? Town { get; set; }
     public string? Name { get; set; }
@@ -14,6 +16,10 @@
     public Gender Gender { get; set; }
     public string? CardNumber { get; set; }
     public List<Person> Children { get; set; } = new();
+
+
+    public List<Relationship> Relationships { get; set; } = new();
+
 
 }
 
